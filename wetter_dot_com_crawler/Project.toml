@@ -1,0 +1,4 @@
+name = "wetter_dot_com_crawler"
+uuid = "4bd6aaab-8d81-49b3-aa49-fdee376aa788"
+authors = ["Artur Tarassow <atecon@posteo.de>"]
+version = "0.1.0"

@@ -1,0 +1,4 @@
+julia -e 'using Pkg; Pkg.generate("test_project")'
+ Generating  project test_project:
+    test_project/Project.toml
+    test_project/src/test_project.jl

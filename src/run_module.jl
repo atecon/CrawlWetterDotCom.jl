@@ -1,31 +1,99 @@
 # module wetter_dot_com_crawler
 using Pkg;
-# Pkg.add(["HTTP", "JSON"], preserve=PRESERVE_DIRECT)
+Pkg.status()
+# Pkg.add(["JSON", "DataFrames", "Dates", "CSV", "HTTP", "JSON"], preserve=PRESERVE_DIRECT)
 using HTTP;
+using CSV;
+using DelimitedFiles;
+using Dates;
+using Printf;
+using DataFrames;
+using JSON;
+
 
 URL = "https://www.wetter.com/wetter_aktuell/wettervorhersage/16_tagesvorhersage/deutschland/hamburg/DE0004130.html"
+CITY_NAME = "Hamburg"
+
+
+function readfile(filename::String)::String
+    return read(filename, String)
+end
+
+function outfile(content::String, filename::String)
+    """ Write content to asciss file. """
+    open(filename, "w") do f
+        write(f, content)
+    end
+end
 
 function fetch_html_body(url::String)::String
     res = HTTP.request("GET", url, verbose=0)
     # println(res.status)
-    println(String(res.body))
+    return String(res.body)
 end
 
-function parse_json_string(body::String)::String
-    
+function create_regex_pattern()::String
+    """ Create regex pattern for parsing. """
+    date_today = Dates.today()
+    # pattern = @sprintf("r\"({\"date\":\"%s\",\"precipitation\":)(.\\*])\"", date_today)
+    return "({\"date\":\"2020-11-26\",\"precipitation\":)(.*])"
 end
 
-body = fetch_html_body(URL)
+function parse_json_string(body::String) # ::String
+    # pattern = create_regex_pattern()
+    # matched = match(pattern, body)
+    """ Currently using 'pattern' does not work due to escape '\'. """
+
+    matched = match(r"({\"date\":\"2020-11-26\",\"precipitation\":)(.*])", body)
+
+    json = String(matched.match)
+    json = remove_whitespaces(json)
+    json = add_list_opener(json)
+end
+
+function add_list_opener(content::String)
+    content = "[" * content
+end
+
+function remove_whitespaces(content::String)::String
+    replace(content, " " => "")
+end
+
+function repeat_string(s::String, times::Int64)::Array
+    """Repeat a specific string and append each time to an array. """
+    arr = Array{Union{Nothing,String}}(nothing, times)
+    for i = 1:times
+        arr[i] = s
+    end
+    return arr
+end
 
 
+"""
+body = fetch_html_body(URL);
+outfile(body, "./data/html_hh.html");
+"""
+body = readfile("./data/html_hh.html");
+
+json_string = parse_json_string(body);
+json = JSON.parse(json_string);     # parse json_string to array type
+df = reduce(vcat, DataFrame.(json))
+df.date = Date.(df.date, "yyyy-mm-dd");
+
+df.city = repeat_string(CITY_NAME, nrow(df))  # add city name column
+select(df, ["date", "city"], :)               # reorder columns
 
 
-{"date":"2020-11-25","precipitation":0,"temperatureMax":7,"temperatureMin":2,"sunhours":4},{"date":"2020-11-26","precipitation":0.6,"temperatureMax":10,"temperatureMin":6,"sunhours":1},{"date":"2020-11-27","precipitation":0,"temperatureMax":6,"temperatureMin":2,"sunhours":0},{"date":"2020-11-28","precipitation":0,"temperatureMax":7,"temperatureMin":4,"sunhours":2},{"date":"2020-11-29","precipitation":0,"temperatureMax":3,"temperatureMin":0,"sunhours":4},{"date":"2020-11-30","precipitation":0,"temperatureMax":3,"temperatureMin":-1,"sunhours":2},{"date":"2020-12-01","precipitation":0,"temperatureMax":5,"temperatureMin":2,"sunhours":1},{"date":"2020-12-02","precipitation":0,"temperatureMax":6,"temperatureMin":4,"sunhours":1},{"date":"2020-12-03","precipitation":0,"temperatureMax":4,"temperatureMin":1,"sunhours":0},{"date":"2020-12-04","precipitation":0,"temperatureMax":3,"temperatureMin":0,"sunhours":2},{"date":"2020-12-05","precipitation":0,"temperatureMax":4,"temperatureMin":0,"sunhours":1},{"date":"2020-12-06","precipitation":0.9,"temperatureMax":3,"temperatureMin":1,"sunhours":2},{"date":"2020-12-07","precipitation":0.5,"temperatureMax":7,"temperatureMin":3,"sunhours":0},{"date":"2020-12-08","precipitation":0.4,"temperatureMax":9,"temperatureMin":7,"sunhours":1},{"date":"2020-12-09","precipitation":0.1,"temperatureMax":8,"temperatureMin":6,"sunhours":1},{"date":"2020-12-10","precipitation":0.5,"temperatureMax":9,"temperatureMin":8,"sunhours":0}            ]</script>
+ncol(df)
+nrow(df)
+names(df)
+describe(df)
 
 
-# dat = JSON.parse(join(readlines(IOBuffer(res.body)), " "))
-# haskey(dat, "bpi") ? dat["bpi"] : Dict()
-
+# TODO:
+1) add a column "date_of_information"
+2) Configure a json with key=city, value=url
+3) Loop over all key-value pairs and concatenate resulting data frames to get a single one
 
 # end # module
 

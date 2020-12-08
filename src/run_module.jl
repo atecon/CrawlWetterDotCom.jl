@@ -1,7 +1,7 @@
 # module wetter_dot_com_crawler
 using Pkg;
 Pkg.status()
-# Pkg.add(["JSON", "DataFrames", "Dates", "CSV", "HTTP", "JSON"], preserve=PRESERVE_DIRECT)
+# Pkg.add(["JuliaFormatter", "DataFrames", "Dates", "CSV", "HTTP", "JSON"], preserve=PRESERVE_DIRECT)
 using HTTP;
 using CSV;
 using DelimitedFiles;
@@ -9,11 +9,21 @@ using Dates;
 using Printf;
 using DataFrames;
 using JSON;
+using Logging;
+
+USE_JSON = true
+
+if USE_JSON
+    PATH_JSON = "./data/city_url.json"
+else
+    URL = "https://www.wetter.com/wetter_aktuell/wettervorhersage/16_tagesvorhersage/deutschland/hamburg/DE0004130.html"
+    CITY_NAME = "Hamburg"
+end
 
 
-URL = "https://www.wetter.com/wetter_aktuell/wettervorhersage/16_tagesvorhersage/deutschland/hamburg/DE0004130.html"
-CITY_NAME = "Hamburg"
-
+function read_json(filename::String)
+    return JSON.parsefile(filename)
+end
 
 function readfile(filename::String)::String
     return read(filename, String)
@@ -29,6 +39,7 @@ end
 function fetch_html_body(url::String)::String
     res = HTTP.request("GET", url, verbose=0)
     # println(res.status)
+    # TODO: Add check
     return String(res.body)
 end
 
@@ -36,7 +47,7 @@ function create_regex_pattern()::String
     """ Create regex pattern for parsing. """
     date_today = Dates.today()
     # pattern = @sprintf("r\"({\"date\":\"%s\",\"precipitation\":)(.\\*])\"", date_today)
-    return "({\"date\":\"2020-11-26\",\"precipitation\":)(.*])"
+    return "({\"date\":\"2020-11-08\",\"precipitation\":)(.*])"
 end
 
 function parse_json_string(body::String) # ::String
@@ -44,11 +55,20 @@ function parse_json_string(body::String) # ::String
     # matched = match(pattern, body)
     """ Currently using 'pattern' does not work due to escape '\'. """
 
-    matched = match(r"({\"date\":\"2020-11-26\",\"precipitation\":)(.*])", body)
+    json = ""
+    err = false
 
-    json = String(matched.match)
-    json = remove_whitespaces(json)
-    json = add_list_opener(json)
+    matched = match(r"({\"date\":\"2020-12-08\",\"precipitation\":)(.*])", body)
+    try
+        json = String(matched.match)
+        json = remove_whitespaces(json)
+        json = add_list_opener(json)
+    catch
+        @warn "No match for pattern found. Ignore."
+        err = true
+    end
+
+    return json, err
 end
 
 function add_list_opener(content::String)
@@ -68,32 +88,62 @@ function repeat_string(s::String, times::Int64)::Array
     return arr
 end
 
-
-"""
-body = fetch_html_body(URL);
-outfile(body, "./data/html_hh.html");
-"""
-body = readfile("./data/html_hh.html");
-
-json_string = parse_json_string(body);
-json = JSON.parse(json_string);     # parse json_string to array type
-df = reduce(vcat, DataFrame.(json))
-df.date = Date.(df.date, "yyyy-mm-dd");
-
-df.city = repeat_string(CITY_NAME, nrow(df))  # add city name column
-select(df, ["date", "city"], :)               # reorder columns
+function append_to_df(target::DataFrame, source::DataFrame)::DataFrame
+    if names(target) == names(source)
+        append!(target, source)
+    else
+        @error "Cannot append data frame as columns do not match."
+    end
+    return target
+end
 
 
-ncol(df)
-nrow(df)
-names(df)
-describe(df)
+if USE_JSON
+    cities = read_json(PATH_JSON)
+else
+    body = readfile("./data/html_hh.html");
+end
+
+@info @sprintf("Start crawling data for %d cities.", length(keys(cities)))
+
+df_final = DataFrame(doi=Date[],
+                    date=Date[],
+                    city=String[],
+                    precipitation=Float64[],
+                    sunhours=Int64[],
+                    temperatureMax=Int64[],
+                    temperatureMin=Int64[])
 
 
-# TODO:
-1) add a column "date_of_information"
-2) Configure a json with key=city, value=url
-3) Loop over all key-value pairs and concatenate resulting data frames to get a single one
+for (city, url) in cities
+    @info @sprintf("Start fetching data for '%s'.\n", city)
+    body = fetch_html_body(url)
+
+    json_string, err = parse_json_string(body);
+    if err
+        @warn @sprintf("Ignore '%s' as not recent data could be found.\n", city)
+        continue
+    end
+
+    json = JSON.parse(json_string);                 # parse json_string to array type
+    df = reduce(vcat, DataFrame.(json))
+    df.date = Date.(df.date, "yyyy-mm-dd");
+    df.city = repeat_string(city, nrow(df));  # this is faster than <df[!,:city2] .= CITY_NAME;>
+    df[:,:doi] .= Dates.today()                    # date_of_information
+    select!(df, ["doi", "date", "city"], :);       # reorder columns
+
+    df_final = append_to_df(df_final, df)
+    print(df_final)
+
+    @info @sprintf("Succesfully finished parsing and storing data for '%s'.\n", city)
+end
+
+ncol(df_final)
+nrow(df_final)
+names(df_final)
+describe(df_final)
+
+
 
 # end # module
 

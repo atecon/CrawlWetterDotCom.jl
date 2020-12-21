@@ -1,7 +1,7 @@
-# module wetter_dot_com_crawler
-using Pkg;
-Pkg.status()
-#Pkg.add(["JuliaFormatter", "DataFrames", "Dates", "CSV", "HTTP", "JSON"], preserve=PRESERVE_DIRECT)
+# module CrawlWetterDotCom
+# using Pkg;
+# Pkg.status()
+# Pkg.add(["HTTP", "CSV", "DelimitedFiles", "Dates", "Printf", "DataFrames", "JSON", "Logging"], preserve=PRESERVE_DIRECT)
 using HTTP;
 using CSV;
 using DelimitedFiles;
@@ -97,7 +97,7 @@ function initialize_dataframe()::DataFrame
                     temperatureMin=Int8[])
 end
 
-function CrawlWetterDotCom(JSON_FILE::JSON)::DataFrame
+function CrawlWetterDotCom(JSON_FILE::String)::DataFrame
     """ Main function """
 
     cities = read_json(JSON_FILE)
@@ -129,7 +129,8 @@ function CrawlWetterDotCom(JSON_FILE::JSON)::DataFrame
 
     @info @sprintf("Column labels of final data frame are: %s", names(df_final))
     @info @sprintf("Final data frame is of dimension: nrows=%d by ncols=%s", nrow(df_final), ncol(df_final))
-    # describe(df_final)
+
+    return df_final
 end
 
 # end # module

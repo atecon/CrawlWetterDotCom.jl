@@ -1,2 +1,2 @@
-# wetter_dot_com_crawler
-Crawl data from wetter.com 
+# CrawlWetterDotCom
+Crawl weather data from www.wetter.com

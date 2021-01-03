@@ -1,15 +1,8 @@
-# module CrawlWetterDotCom
-# using Pkg;
-# Pkg.status()
-# Pkg.add(["HTTP", "CSV", "DelimitedFiles", "Dates", "Printf", "DataFrames", "JSON", "Logging"], preserve=PRESERVE_DIRECT)
-using HTTP;
-using CSV;
-using DelimitedFiles;
-using Dates;
-using Printf;
-using DataFrames;
-using JSON;
-using Logging;
+module CrawlWetterDotCom
+# Pkg.add(["Pkg", "HTTP", "CSV", "DelimitedFiles", "Dates", "Printf", "DataFrames", "JSON", "Logging"], preserve=PRESERVE_DIRECT)
+using HTTP, CSV, DelimitedFiles, Dates, Printf, DataFrames, JSON, Logging;
+
+export Crawler
 
 function read_json(filename::String)
     return JSON.parsefile(filename)
@@ -39,8 +32,7 @@ function create_regex_pattern()::String
     return "({\"date\":\"$date_today\",\"precipitation\":)(.*])"
 end
 
-
-function parse_json_string(body::String) # ::String
+function parse_json_string(body::String)::Tuple{String,Bool}
     json = ""
     err = false
 
@@ -58,7 +50,7 @@ function parse_json_string(body::String) # ::String
     return json, err
 end
 
-function add_list_opener(content::String)
+function add_list_opener(content::String)::String
     content = "[" * content
 end
 
@@ -97,9 +89,7 @@ function initialize_dataframe()::DataFrame
                     temperatureMin=Int8[])
 end
 
-function CrawlWetterDotCom(JSON_FILE::String)::DataFrame
-    """ Main function """
-
+function Crawler(JSON_FILE::String)::DataFrame
     cities = read_json(JSON_FILE)
     @info @sprintf("Start crawling data for %d cities.", length(keys(cities)))
 
@@ -133,4 +123,4 @@ function CrawlWetterDotCom(JSON_FILE::String)::DataFrame
     return df_final
 end
 
-# end # module
+end

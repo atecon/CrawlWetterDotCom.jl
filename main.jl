@@ -1,3 +1,4 @@
 using CrawlWetterDotCom
 
-df = CrawlWetterDotCom("./data/city_url.json")
+df = Crawler("./data/city_url.json")
+df
